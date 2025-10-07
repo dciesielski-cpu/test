@@ -270,7 +270,7 @@ export default function MapInner({
     }}
   >
     <div className="px-2 sm:px-4 bg-orange-500 border-indigo-900/20 border-t-2">
-      <div className="flex flex-wrap items-stretch gap-2 py-2 mx-auto">
+      <div className="flex flex-wrap items-stretch max-w-7xl gap-2 py-2 mx-auto">
 
         {/* pseudo-checkboxes */}
         <button
