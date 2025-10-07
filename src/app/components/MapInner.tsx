@@ -64,7 +64,7 @@ const DEMO: OfferPoint[] = [
   {
     id: "obo-waw",
     title: "Adapt Camp Halloween\nWeekendowy obóz z rodzicem",
-    city: "Licheń Stary",
+    city: "Wielkopolskie",
     start: "2025-10-18",
     end: "2025-10-19",
     address: "ul. Klasztorna 4, 62-563 Licheń Stary, Polska",
@@ -77,7 +77,7 @@ const DEMO: OfferPoint[] = [
   {
     id: "pol-waw",
     title: "Półkolonie Warszawa – Mokotów",
-    city: "Warszawa",
+    city: "Mazowieckie",
     start: "2025-07-01",
     end: "2025-07-05",
     address: "Mokotów, Warszawa, Polska",
@@ -90,7 +90,7 @@ const DEMO: OfferPoint[] = [
   {
     id: "obo-gda",
     title: "Obóz Gdańsk – Oliwa",
-    city: "Gdańsk",
+    city: "Pomorskie",
     start: "2025-07-10",
     end: "2025-07-16",
     address: "Oliwa, Gdańsk, Polska",
@@ -103,7 +103,7 @@ const DEMO: OfferPoint[] = [
   {
     id: "pol-poz",
     title: "Półkolonie Poznań – Winogrady",
-    city: "Poznań",
+    city: "Wielkopolskie",
     start: "2025-07-18",
     end: "2025-07-22",
     address: "Winogrady, Poznań, Polska",
@@ -114,6 +114,7 @@ const DEMO: OfferPoint[] = [
       "Dużo ruchu, zabawy i zajęcia tematyczne – idealne na aktywne wakacje w mieście.",
   },
 ];
+
 
 // --- Simple client cache to reduce API calls across navigations
 const localCacheKey = (addr: string) => `geo:${addr.toLowerCase()}`;
@@ -260,7 +261,7 @@ export default function MapInner({
       {/* ===== Control bar (as in your original) ===== */}
         {/* ===== Control bar ===== */}
   <div
-    className="z-[9999] sticky top-[80px]"
+    className="z-[9999]"
     // klik poza dropdownami – zamknij wszystkie
     onClick={() => {
       setCityOpen(false);
@@ -470,7 +471,7 @@ export default function MapInner({
   </div>
 
       {/* ===== Map ===== */}
-      <div className="mx-auto">
+      <div className="mx-auto max-w-7xl mt-8">
         <div className="relative h-[380px] sm:h-[460px] lg:h-[520px] rounded-lg overflow-hidden shadow">
           <MapContainer
             center={center}
