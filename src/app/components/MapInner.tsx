@@ -7,8 +7,6 @@ import L, { LatLngBounds } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Image from "next/image";
 import {
-  Tent,
-  School,
   MapPin,
   CalendarDays,
   ArrowUpDown,
@@ -48,10 +46,8 @@ function makeTearIconHex(hex: string) {
     className: "",
     html: `
       <svg width="28" height="40" viewBox="0 0 64 92" xmlns="http://www.w3.org/2000/svg">
-        <defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-opacity=".35"/></filter></defs>
-        <path d="M32 2C16 2 2 16 2 32c0 19 22 40 28.2 56 .3 .8 1.3 .8 1.6 0C40 72 62 51 62 32 62 16 48 2 32 2z"
-              fill="${hex}" filter="url(#s)"/>
+        <defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-opacity=".35"/></filter></defs>
+        <path d="M32 2C16 2 2 16 2 32c0 19 22 40 28.2 56 .3 .8 1.3 .8 1.6 0C40 72 62 51 62 32 62 16 48 2 32 2z" fill="${hex}" filter="url(#s)"/>
         <circle cx="32" cy="34" r="10" fill="white" opacity=".9"/>
       </svg>
     `,
@@ -60,11 +56,54 @@ function makeTearIconHex(hex: string) {
     popupAnchor: [0, -40],
   });
 }
-
+function PinSvg({ color }: { color: "orange" | "navy" }) {
+  const fill = color === "orange" ? "#f97316" : "#0f172a";
+  return (
+    <svg width="16" height="22" viewBox="0 0 64 92" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+      <path d="M32 2C16 2 2 16 2 32c0 19 22 40 28.2 56 .3 .8 1.3 .8 1.6 0C40 72 62 51 62 32 62 16 48 2 32 2z" fill={fill} />
+      <circle cx="32" cy="34" r="10" fill="white" opacity=".9" />
+    </svg>
+  );
+}
 const PIN_ORANGE = makeTearIconHex("#f97316");
 const PIN_ORANGE_DARK = makeTearIconHex("#f9731650");
 const PIN_NAVY = makeTearIconHex("#0f172a");
 const PIN_NAVY_DARK = makeTearIconHex("#0f172a50");
+
+/* ===== Checkbox z pinem ===== */
+function PinCheckbox({
+  label,
+  color,
+  checked,
+  onClick,
+}: {
+  label: string;
+  color: "orange" | "navy";
+  checked: boolean;
+  onClick: () => void;
+}) {
+  const borderColor = checked ? "border-black" : "border-black/60";
+  const textColor = checked ? "text-black" : "text-black/90";
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-transparent rounded-md ${textColor}`}
+      title={label}
+      aria-pressed={checked}
+    >
+      {/* Kwadrat checkboxa */}
+      <span
+        className={`flex items-center justify-center w-5 h-5 rounded-sm border ${borderColor} bg-white/10`}
+      >
+        {checked ? <PinSvg color={color} /> : null}
+      </span>
+      <span className="text-sm font-semibold">{label}</span>
+    </button>
+  );
+}
 
 /* ===== Demo data ===== */
 const DEMO: OfferPoint[] = [
@@ -286,34 +325,21 @@ export default function MapInner({
         className="z-[9999] sticky top-[80px]"
         onClick={() => { setCityOpen(false); setDateOpen(false); setSortOpen(false); }}
       >
-        <div className="px-2 sm:px-4 bg-orange-500 border-indigo-900/20 border-t-2">
-          <div className="flex flex-wrap items-stretch max-w-7xl gap-2 py-2 mx-auto">
-            {/* pseudo-checkboxy */}
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleType("obozy"); }}
-              className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
-                selectedTypes.has("obozy")
-                  ? "bg-orange-600 text-white"
-                  : "bg-transparent text-white/90"
-              }`}
-              title="Obozy"
-            >
-              <Tent className="h-4 w-4" />
-              <span className="text-sm font-semibold">Obozy</span>
-            </button>
-
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleType("polkolonie"); }}
-              className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
-                selectedTypes.has("polkolonie")
-                  ? "bg-[#0f172a] text-white"
-                  : "bg-transparent text-white/90"
-              }`}
-              title="Półkolonie"
-            >
-              <School className="h-4 w-4" />
-              <span className="text-sm font-semibold">Półkolonie</span>
-            </button>
+        <div className="px-2 sm:px-4 bg-white border-indigo-900/20 border-t-2">
+          <div className="flex flex-wrap text-black items-stretch max-w-7xl gap-2 py-2 mx-auto">
+            {/* checkboxy z pinami */}
+            <PinCheckbox
+              label="Obozy"
+              color="orange"
+              checked={selectedTypes.has("obozy")}
+              onClick={() => toggleType("obozy")}
+            />
+            <PinCheckbox
+              label="Półkolonie"
+              color="navy"
+              checked={selectedTypes.has("polkolonie")}
+              onClick={() => toggleType("polkolonie")}
+            />
 
             {/* prawa strona */}
             <div className="flex items-stretch gap-2 flex-1 min-w-[320px]">
@@ -436,7 +462,7 @@ export default function MapInner({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {/* LEWA kolumna: oferty */}
           <div>
-            <div className="grid pt-4 grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid pt-6 grid-cols-1 md:grid-cols-2 gap-4">
               {filtered.map((p) => (
                 <article
                   key={p.id}
@@ -449,7 +475,7 @@ export default function MapInner({
                     (activeId === p.id ? "ring-2 ring-orange-500" : "")
                   }
                 >
-                  <div className="relative h-36">
+                  <div className="relative h-42">
                     <Image
                       src={p.image}
                       alt={p.title}
@@ -489,7 +515,7 @@ export default function MapInner({
           <div className="lg:pl-2">
             <div className="sticky top-[120px] hidden lg:block">
               {/* wysokość pełnego viewportu minus drobny margines; na mobile mapa i tak spada pod listę */}
-              <div className="relative h-[60vh] sm:h-[70vh] lg:h-[85vh] pt-6 pb-18 rounded-lg overflow-hidden">
+              <div className="relative h-[60vh] sm:h-[70vh] lg:h-[85vh] pt-8 pb-18 rounded-lg overflow-hidden">
                 <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="" />
                   <MapFlyControl />
@@ -504,11 +530,7 @@ export default function MapInner({
                         : dark ? PIN_ORANGE_DARK : PIN_ORANGE;
 
                     return (
-                      <Marker
-                        key={p.id}
-                        position={[c!.lat, c!.lng]}
-                        icon={icon}
-                      >
+                      <Marker key={p.id} position={[c!.lat, c!.lng]} icon={icon}>
                         <Popup>
                           <div className="min-w-[240px]">
                             <h4 className="font-semibold text-slate-800 whitespace-pre-line">{p.title}</h4>
