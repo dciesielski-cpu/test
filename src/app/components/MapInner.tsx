@@ -59,7 +59,6 @@ function makeTearIcon(color: "orange" | "navy") {
 }
 const ORANGE_PIN = makeTearIcon("orange");
 const NAVY_PIN = makeTearIcon("navy");
-
 /* ===== Demo data (address only) ===== */
 const DEMO: OfferPoint[] = [
   {
@@ -362,7 +361,7 @@ export default function MapInner({
 
             {dateOpen && (
               <div className="absolute z-[9999] mt-1 w-[320px] rounded-md border border-slate-200 bg-white shadow p-3">
-                <div className="flex items-center gap-2">
+                <div className="items-center gap-2">
                   <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
                     <span className="text-xs text-slate-600">Od</span>
                     <input
