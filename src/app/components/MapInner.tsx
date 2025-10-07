@@ -256,11 +256,11 @@ export default function MapInner({
   const [cityOpen, setCityOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   return (
-    <section className="w-full sticky">
+<section className="w-full">
       {/* ===== Control bar (as in your original) ===== */}
         {/* ===== Control bar ===== */}
   <div
-    className="z-[9999]"
+    className="z-[9999] sticky top-[80px]"
     // klik poza dropdownami – zamknij wszystkie
     onClick={() => {
       setCityOpen(false);
@@ -268,8 +268,8 @@ export default function MapInner({
       setSortOpen(false);
     }}
   >
-    <div className="px-2 sm:px-4 bg-orange-500">
-      <div className="flex flex-wrap items-stretch gap-2 py-2 max-w-7xl mx-auto">
+    <div className="px-2 sm:px-4 bg-orange-500 border-indigo-900/20 border-t-2">
+      <div className="flex flex-wrap items-stretch gap-2 py-2 mx-auto">
 
         {/* pseudo-checkboxes */}
         <button
@@ -470,7 +470,7 @@ export default function MapInner({
   </div>
 
       {/* ===== Map ===== */}
-      <div className="mx-auto max-w-7xl px-2 sm:px-4 py-4">
+      <div className="mx-auto">
         <div className="relative h-[380px] sm:h-[460px] lg:h-[520px] rounded-lg overflow-hidden shadow">
           <MapContainer
             center={center}
@@ -510,7 +510,7 @@ export default function MapInner({
       </div>
 
       {/* ===== Offers grid ===== */}
-      <div className="mx-auto max-w-7xl px-2 sm:px-4 pb-10">
+      <div className="mx-auto mt-12 max-w-7xl px-2 sm:px-4 pb-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((p) => (
             <article
@@ -551,7 +551,7 @@ export default function MapInner({
                   <span>{p.city}</span>
                 </div>
 
-                <p className="mt-3 text-sm text-slate-700 leading-relaxed">
+                <p className="mt-3 text-sm text-slate-700 h-18 leading-relaxed">
                   {p.desc}
                 </p>
 
