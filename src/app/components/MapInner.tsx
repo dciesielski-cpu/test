@@ -1,22 +1,3 @@
-// ===============================
-// 1) .env.local
-// ===============================
-// Keep your API key ONLY on the server. Do NOT expose it to the client.
-// Create .env.local in your project root with:
-//
-// GOOGLE_MAPS_API_KEY=YOUR_SECRET_SERVER_KEY
-//
-// If you also run on Vercel, add this env var there as well.
-
-
-// ===============================
-// 2) app/api/geocode/route.ts  (Next.js 13/14 App Router)
-// ===============================
-
-
-// ===============================
-// 3) components/MapWithOffers.tsx
-// ===============================
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -273,87 +254,181 @@ export default function MapInner({
     .map(p => ({ p, c: coordsById[p.id] }))
     .filter(x => !!x.c) as Array<{ p: OfferPoint; c: Coords }>;
 
+  const [cityOpen, setCityOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
   return (
     <section className="w-full sticky">
       {/* ===== Control bar (as in your original) ===== */}
-      <div className="w-full bg-orange-500 z-[9999]">
-        <div className="px-2 sm:px-4">
-          <div className="flex flex-wrap items-stretch gap-2 py-2">
-            {/* pseudo-checkboxes */}
-            <button
-              onClick={() => toggleType("obozy")}
-              className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
-                selectedTypes.has("obozy")
-                  ? "bg-orange-600 text-white"
-                  : "bg-transparent text-white/90"
-              }`}
-              title="Obozy"
-            >
-              <Tent className="h-4 w-4" />
-              <span className="text-sm font-semibold">Obozy</span>
-            </button>
-            <button
-              onClick={() => toggleType("polkolonie")}
-              className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
-                selectedTypes.has("polkolonie")
-                  ? "bg-[#0f172a] text-white"
-                  : "bg-transparent text-white/90"
-              }`}
-              title="Półkolonie"
-            >
-              <School className="h-4 w-4" />
-              <span className="text-sm font-semibold">Półkolonie</span>
-            </button>
+        {/* ===== Control bar ===== */}
+  <div
+    className="z-[9999]"
+    // klik poza dropdownami – zamknij wszystkie
+    onClick={() => {
+      setCityOpen(false);
+      setDateOpen(false);
+      setSortOpen(false);
+    }}
+  >
+    <div className="px-2 sm:px-4 bg-orange-500">
+      <div className="flex flex-wrap items-stretch gap-2 py-2 max-w-7xl mx-auto">
 
-            {/* city */}
-            <div className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black min-w-[220px]">
+        {/* pseudo-checkboxes */}
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleType("obozy"); }}
+          className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
+            selectedTypes.has("obozy")
+              ? "bg-orange-600 text-white"
+              : "bg-transparent text-white/90"
+          }`}
+          title="Obozy"
+        >
+          <Tent className="h-4 w-4" />
+          <span className="text-sm font-semibold">Obozy</span>
+        </button>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleType("polkolonie"); }}
+          className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
+            selectedTypes.has("polkolonie")
+              ? "bg-[#0f172a] text-white"
+              : "bg-transparent text-white/90"
+          }`}
+          title="Półkolonie"
+        >
+          <School className="h-4 w-4" />
+          <span className="text-sm font-semibold">Półkolonie</span>
+        </button>
+
+        {/* Right side grows: City, Dates, Sort, Search */}
+        <div className="flex items-stretch gap-2 flex-1 min-w-[320px]">
+
+          {/* city dropdown (jak sortOpen) */}
+          <div
+            className="relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setCityOpen((v) => !v);
+                setDateOpen(false);
+                setSortOpen(false);
+              }}
+              className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black min-w-[220px]"
+            >
               <MapPin className="h-4 w-4 text-slate-700" />
-              <select
-                value={city}
-                onChange={e => setCity(e.target.value)}
-                className="w-full bg-transparent outline-none text-sm"
-              >
-                {cities.map(c => (
-                  <option key={c}>{c}</option>
+              <span className="text-sm">{city || "Wybierz lokalizację"}</span>
+              {cityOpen ? <ChevronUp className="h-4 w-4 ml-auto" /> : <ChevronDown className="h-4 w-4 ml-auto" />}
+            </button>
+
+            {cityOpen && (
+              <div className="absolute z-[9999] mt-1 w-[260px] rounded-md border border-slate-200 bg-white shadow">
+                {cities.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      setCity(c);
+                      setCityOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                      city === c ? "font-semibold" : ""
+                    }`}
+                  >
+                    {c}
+                  </button>
                 ))}
-              </select>
-            </div>
+              </div>
+            )}
+          </div>
 
-            {/* dates */}
-            <div className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black">
+          {/* dates dropdown (jak sortOpen) */}
+          <div
+            className="relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setDateOpen((v) => !v);
+                setCityOpen(false);
+                setSortOpen(false);
+              }}
+              className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black"
+            >
               <CalendarDays className="h-4 w-4 text-slate-700" />
-              <input
-                type="date"
-                value={from}
-                onChange={e => setFrom(e.target.value)}
-                className="bg-transparent outline-none text-sm"
-              />
-              <span className="opacity-70 text-sm">–</span>
-              <input
-                type="date"
-                value={to}
-                onChange={e => setTo(e.target.value)}
-                className="bg-transparent outline-none text-sm"
-              />
-            </div>
+              <span className="text-sm">
+                {from || to ? `${from || "od"} – ${to || "do"}` : "Wybierz daty"}
+              </span>
+              {dateOpen ? <ChevronUp className="ml-12 h-4 w-4" /> : <ChevronDown className="ml-12 h-4 w-4" />}
+            </button>
 
+            {dateOpen && (
+              <div className="absolute z-[9999] mt-1 w-[320px] rounded-md border border-slate-200 bg-white shadow p-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
+                    <span className="text-xs text-slate-600">Od</span>
+                    <input
+                      type="date"
+                      value={from}
+                      onChange={(e) => setFrom(e.target.value)}
+                      className="bg-transparent outline-none text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
+                    <span className="text-xs text-slate-600">Do</span>
+                    <input
+                      type="date"
+                      value={to}
+                      onChange={(e) => setTo(e.target.value)}
+                      className="bg-transparent outline-none text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    className="text-sm px-2 py-1 rounded hover:bg-slate-50"
+                    onClick={() => { setFrom(""); setTo(""); setDateOpen(false); }}
+                  >
+                    Wyczyść
+                  </button>
+                  <button
+                    className="text-sm px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600"
+                    onClick={() => setDateOpen(false)}
+                  >
+                    Zastosuj
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* sort + search obok siebie 50/50 wolnej szerokości */}
+          <div className="flex gap-2 flex-1 min-w-[280px]">
             {/* sort dropdown */}
-            <div className="relative">
+            <div
+              className="relative basis-1/2 flex-1"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
-                onClick={() => setSortOpen(v => !v)}
-                className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black"
+                onClick={() => {
+                  setSortOpen((v) => !v);
+                  setCityOpen(false);
+                  setDateOpen(false);
+                }}
+                className="w-full justify-between flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black"
               >
-                <ArrowUpDown className="h-4 w-4 text-slate-700" />
-                <span className="text-sm">Sortuj według</span>
+                <span className="flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4 text-slate-700" />
+                  <span className="text-sm">Sortuj według</span>
+                </span>
                 {sortOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>
+
               {sortOpen && (
-                <div className="absolute z-[9999] mt-1 w-52 rounded-md border border-slate-200 bg-white shadow">
+                <div className="absolute z-[9999] mt-1 w-full rounded-md border border-slate-200 bg-white shadow">
                   {[
                     { key: "price", label: "Ceny" },
                     { key: "date", label: "Daty (start)" },
                     { key: "name", label: "Nazwy" },
-                  ].map(opt => (
+                  ].map((opt) => (
                     <button
                       key={opt.key}
                       onClick={() => {
@@ -369,7 +444,7 @@ export default function MapInner({
                   ))}
                   <div className="border-t" />
                   <button
-                    onClick={() => setAsc(a => !a)}
+                    onClick={() => setAsc((a) => !a)}
                     className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
                   >
                     Kierunek: {asc ? "Rosnąco" : "Malejąco"}
@@ -379,18 +454,21 @@ export default function MapInner({
             </div>
 
             {/* search */}
-            <div className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black flex-1 min-w-[220px]">
+            <div className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black basis-1/2 flex-1 min-w-[160px]">
               <Search className="h-4 w-4 text-slate-700" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Szukaj"
                 className="bg-transparent outline-none text-sm w-full"
+                onClick={(e) => e.stopPropagation()}
               />
             </div>
           </div>
         </div>
       </div>
+    </div>
+  </div>
 
       {/* ===== Map ===== */}
       <div className="mx-auto max-w-7xl px-2 sm:px-4 py-4">
@@ -402,7 +480,7 @@ export default function MapInner({
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution="&copy; OpenStreetMap contributors"
+              attribution=""
             />
 
             {markers.map(({ p, c }) => (
