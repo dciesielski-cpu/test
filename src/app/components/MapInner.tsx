@@ -368,7 +368,7 @@ export default function MapInner({
                       type="date"
                       value={from}
                       onChange={(e) => setFrom(e.target.value)}
-                      className="bg-transparent outline-none text-sm"
+                      className="bg-transparent outline-none text-sm w-[100%]"
                     />
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
@@ -377,7 +377,7 @@ export default function MapInner({
                       type="date"
                       value={to}
                       onChange={(e) => setTo(e.target.value)}
-                      className="bg-transparent outline-none text-sm"
+                      className="bg-transparent outline-none text-sm w-[100%]"
                     />
                   </div>
                 </div>
