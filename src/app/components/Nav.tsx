@@ -6,7 +6,7 @@ import { Facebook, Youtube, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const nav = [
-  { href: "/oferta-zima-2026", label: "OFERTA ZIMA 2026" },
+  { href: "/oferta", label: "OFERTA ZIMA 2026" },
   { href: "/kontakt", label: "KONTAKT I PYTANIA" },
   { href: "/galeria", label: "GALERIA" },
   { href: "/kadra", label: "KADRA" },

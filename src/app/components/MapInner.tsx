@@ -23,13 +23,13 @@ export type OfferPoint = {
   id: string;
   title: string;
   city: string;
-  start: string; // YYYY-MM-DD
-  end: string;   // YYYY-MM-DD
-  address: string; // e.g. "Łazienkowska 6A, 00-449 Warszawa, Polska"
+  start: string;
+  end: string;
+  address: string;
   type: PointType;
-  price: number;       // PLN
-  image: string;       // URL or /public path
-  desc: string;        // short description for card
+  price: number;
+  image: string;
+  desc: string;
 };
 
 export type MapProps = {
@@ -38,9 +38,12 @@ export type MapProps = {
   zoom?: number;
 };
 
-/* ===== Teardrop pins (SVG) ===== */
-function makeTearIcon(color: "orange" | "navy") {
-  const fill = color === "orange" ? "#f97316" : "#0f172a";
+/* ===== Helper: skracanie tekstu ===== */
+const truncate = (str: string = "", n: number = 120) =>
+  str.length > n ? str.slice(0, n).trimEnd() + "…" : str;
+
+/* ===== Teardrop pins (SVG) – wersje zwykłe i „ciemniejsze” ===== */
+function makeTearIconHex(hex: string) {
   return L.divIcon({
     className: "",
     html: `
@@ -48,7 +51,7 @@ function makeTearIcon(color: "orange" | "navy") {
         <defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-opacity=".35"/></filter></defs>
         <path d="M32 2C16 2 2 16 2 32c0 19 22 40 28.2 56 .3 .8 1.3 .8 1.6 0C40 72 62 51 62 32 62 16 48 2 32 2z"
-              fill="${fill}" filter="url(#s)"/>
+              fill="${hex}" filter="url(#s)"/>
         <circle cx="32" cy="34" r="10" fill="white" opacity=".9"/>
       </svg>
     `,
@@ -57,9 +60,13 @@ function makeTearIcon(color: "orange" | "navy") {
     popupAnchor: [0, -40],
   });
 }
-const ORANGE_PIN = makeTearIcon("orange");
-const NAVY_PIN = makeTearIcon("navy");
-/* ===== Demo data (address only) ===== */
+
+const PIN_ORANGE = makeTearIconHex("#f97316");
+const PIN_ORANGE_DARK = makeTearIconHex("#f9731650");
+const PIN_NAVY = makeTearIconHex("#0f172a");
+const PIN_NAVY_DARK = makeTearIconHex("#0f172a50");
+
+/* ===== Demo data ===== */
 const DEMO: OfferPoint[] = [
   {
     id: "obo-waw",
@@ -115,10 +122,9 @@ const DEMO: OfferPoint[] = [
   },
 ];
 
-
-// --- Simple client cache to reduce API calls across navigations
+/* ===== Local cache for geocoding ===== */
 const localCacheKey = (addr: string) => `geo:${addr.toLowerCase()}`;
-function getCached(addr: string): { lat: number; lng: number; formatted?: string } | null {
+function getCached(addr: string) {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(localCacheKey(addr));
@@ -127,10 +133,10 @@ function getCached(addr: string): { lat: number; lng: number; formatted?: string
   return null;
 }
 function setCached(addr: string, value: any) {
-  try { localStorage.setItem(localCacheKey(addr), JSON.stringify(value)); } catch {}
+  try {
+    localStorage.setItem(localCacheKey(addr), JSON.stringify(value));
+  } catch {}
 }
-
-// Fetch coordinates for one address via our server route
 async function geocodeAddress(address: string) {
   const cached = getCached(address);
   if (cached) return cached;
@@ -141,16 +147,30 @@ async function geocodeAddress(address: string) {
   return data as { lat: number; lng: number; formatted?: string };
 }
 
-// Helper: fit map to markers once loaded
+/* ===== Helpers for map ===== */
 function FitBoundsOnce({ coords }: { coords: Array<{ lat: number; lng: number }> }) {
   const map = useMap();
   const fitted = useRef(false);
   useEffect(() => {
     if (fitted.current || !coords.length) return;
-    const bounds = coords.reduce((b, c) => b.extend([c.lat, c.lng] as any), new LatLngBounds([[coords[0].lat, coords[0].lng], [coords[0].lat, coords[0].lng]]));
+    const bounds = coords.reduce(
+      (b, c) => b.extend([c.lat, c.lng] as any),
+      new LatLngBounds([[coords[0].lat, coords[0].lng], [coords[0].lat, coords[0].lng]])
+    );
     map.fitBounds(bounds.pad(0.15));
     fitted.current = true;
   }, [coords, map]);
+  return null;
+}
+
+/** Rejestruje globalną funkcję, by przycisk „Pokaż na mapie” mógł flyTo do markera */
+function MapFlyControl() {
+  const map = useMap();
+  useEffect(() => {
+    (window as any).__flyTo = (lat: number, lng: number) =>
+      map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 0.6 });
+    return () => { delete (window as any).__flyTo; };
+  }, [map]);
   return null;
 }
 
@@ -161,7 +181,7 @@ export default function MapInner({
 }: MapProps) {
   /* filters */
   const [selectedTypes, setSelectedTypes] = useState<Set<PointType>>(
-    () => new Set(["obozy", "polkolonie"]) 
+    () => new Set(["obozy", "polkolonie"])
   );
   const [city, setCity] = useState("Wybierz lokalizację");
   const [from, setFrom] = useState("");
@@ -183,11 +203,11 @@ export default function MapInner({
     setSelectedTypes(prev => {
       const n = new Set(prev);
       n.has(t) ? n.delete(t) : n.add(t);
-      if (n.size === 0) n.add(t); // safeguard
+      if (n.size === 0) n.add(t);
       return n;
     });
 
-  // === Geocode unique addresses ===
+  // === Geocode ===
   type Coords = { lat: number; lng: number; formatted?: string };
   const [coordsById, setCoordsById] = useState<Record<string, Coords | null>>({});
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
@@ -196,9 +216,6 @@ export default function MapInner({
   useEffect(() => {
     let isCancelled = false;
     async function run() {
-      const unique = new Map<string, string>(); // address -> any id
-      points.forEach(p => unique.set(p.address, p.id));
-
       for (const p of points) {
         if (coordsById[p.id] || loadingIds.has(p.id)) continue;
         setLoadingIds(s => new Set(s).add(p.id));
@@ -212,14 +229,13 @@ export default function MapInner({
           setCoordsById(prev => ({ ...prev, [p.id]: null }));
         } finally {
           setLoadingIds(s => { const n = new Set(s); n.delete(p.id); return n; });
-          // Gentle throttle to avoid QPS limits (optional)
           await new Promise(r => setTimeout(r, 120));
         }
       }
     }
     run();
     return () => { isCancelled = true; };
-  }, [points]);
+  }, [points]); // eslint-disable-line
 
   const filtered = useMemo(() => {
     const qq = q.toLowerCase();
@@ -246,325 +262,285 @@ export default function MapInner({
     return sorted;
   }, [points, selectedTypes, city, from, to, q, sortBy, asc]);
 
-  /* helpers */
   const fmtPrice = (pln: number) => `od ${pln.toLocaleString("pl-PL")} zł`;
 
-  // Build markers from geocoded coords
   const markers = filtered
     .map(p => ({ p, c: coordsById[p.id] }))
     .filter(x => !!x.c) as Array<{ p: OfferPoint; c: Coords }>;
 
+  const coords = markers.map(m => m.c!);
+
+  /* dropdown ui state */
   const [cityOpen, setCityOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+
+  /* synchronizacja karta ↔ pin */
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
   return (
-<section className="w-full">
-      {/* ===== Control bar (as in your original) ===== */}
-        {/* ===== Control bar ===== */}
-  <div
-    className="z-[9999]"
-    // klik poza dropdownami – zamknij wszystkie
-    onClick={() => {
-      setCityOpen(false);
-      setDateOpen(false);
-      setSortOpen(false);
-    }}
-  >
-    <div className="px-2 sm:px-4 bg-orange-500 border-indigo-900/20 border-t-2">
-      <div className="flex flex-wrap items-stretch max-w-7xl gap-2 py-2 mx-auto">
-
-        {/* pseudo-checkboxes */}
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleType("obozy"); }}
-          className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
-            selectedTypes.has("obozy")
-              ? "bg-orange-600 text-white"
-              : "bg-transparent text-white/90"
-          }`}
-          title="Obozy"
-        >
-          <Tent className="h-4 w-4" />
-          <span className="text-sm font-semibold">Obozy</span>
-        </button>
-
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleType("polkolonie"); }}
-          className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
-            selectedTypes.has("polkolonie")
-              ? "bg-[#0f172a] text-white"
-              : "bg-transparent text-white/90"
-          }`}
-          title="Półkolonie"
-        >
-          <School className="h-4 w-4" />
-          <span className="text-sm font-semibold">Półkolonie</span>
-        </button>
-
-        {/* Right side grows: City, Dates, Sort, Search */}
-        <div className="flex items-stretch gap-2 flex-1 min-w-[320px]">
-
-          {/* city dropdown (jak sortOpen) */}
-          <div
-            className="relative"
-            onClick={(e) => e.stopPropagation()}
-          >
+    <section className="w-full">
+      {/* ===== Pasek sterowania ===== */}
+      <div
+        className="z-[9999] sticky top-[80px]"
+        onClick={() => { setCityOpen(false); setDateOpen(false); setSortOpen(false); }}
+      >
+        <div className="px-2 sm:px-4 bg-orange-500 border-indigo-900/20 border-t-2">
+          <div className="flex flex-wrap items-stretch max-w-7xl gap-2 py-2 mx-auto">
+            {/* pseudo-checkboxy */}
             <button
-              onClick={() => {
-                setCityOpen((v) => !v);
-                setDateOpen(false);
-                setSortOpen(false);
-              }}
-              className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black min-w-[220px]"
+              onClick={(e) => { e.stopPropagation(); toggleType("obozy"); }}
+              className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
+                selectedTypes.has("obozy")
+                  ? "bg-orange-600 text-white"
+                  : "bg-transparent text-white/90"
+              }`}
+              title="Obozy"
             >
-              <MapPin className="h-4 w-4 text-slate-700" />
-              <span className="text-sm">{city || "Wybierz lokalizację"}</span>
-              {cityOpen ? <ChevronUp className="h-4 w-4 ml-auto" /> : <ChevronDown className="h-4 w-4 ml-auto" />}
+              <Tent className="h-4 w-4" />
+              <span className="text-sm font-semibold">Obozy</span>
             </button>
 
-            {cityOpen && (
-              <div className="absolute z-[9999] mt-1 w-[260px] rounded-md border border-slate-200 bg-white shadow">
-                {cities.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => {
-                      setCity(c);
-                      setCityOpen(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                      city === c ? "font-semibold" : ""
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* dates dropdown (jak sortOpen) */}
-          <div
-            className="relative"
-            onClick={(e) => e.stopPropagation()}
-          >
             <button
-              onClick={() => {
-                setDateOpen((v) => !v);
-                setCityOpen(false);
-                setSortOpen(false);
-              }}
-              className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black"
+              onClick={(e) => { e.stopPropagation(); toggleType("polkolonie"); }}
+              className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 ${
+                selectedTypes.has("polkolonie")
+                  ? "bg-[#0f172a] text-white"
+                  : "bg-transparent text-white/90"
+              }`}
+              title="Półkolonie"
             >
-              <CalendarDays className="h-4 w-4 text-slate-700" />
-              <span className="text-sm">
-                {from || to ? `${from || "od"} – ${to || "do"}` : "Wybierz daty"}
-              </span>
-              {dateOpen ? <ChevronUp className="ml-12 h-4 w-4" /> : <ChevronDown className="ml-12 h-4 w-4" />}
+              <School className="h-4 w-4" />
+              <span className="text-sm font-semibold">Półkolonie</span>
             </button>
 
-            {dateOpen && (
-              <div className="absolute z-[9999] mt-1 w-[320px] rounded-md border border-slate-200 bg-white shadow p-3">
-                <div className="items-center gap-2">
-                  <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
-                    <span className="text-xs text-slate-600">Od</span>
-                    <input
-                      type="date"
-                      value={from}
-                      onChange={(e) => setFrom(e.target.value)}
-                      className="bg-transparent outline-none text-sm w-[100%]"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
-                    <span className="text-xs text-slate-600">Do</span>
-                    <input
-                      type="date"
-                      value={to}
-                      onChange={(e) => setTo(e.target.value)}
-                      className="bg-transparent outline-none text-sm w-[100%]"
-                    />
-                  </div>
-                </div>
-                <div className="mt-2 flex justify-end gap-2">
-                  <button
-                    className="text-sm px-2 py-1 rounded hover:bg-slate-50"
-                    onClick={() => { setFrom(""); setTo(""); setDateOpen(false); }}
-                  >
-                    Wyczyść
-                  </button>
-                  <button
-                    className="text-sm px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600"
-                    onClick={() => setDateOpen(false)}
-                  >
-                    Zastosuj
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* sort + search obok siebie 50/50 wolnej szerokości */}
-          <div className="flex gap-2 flex-1 min-w-[280px]">
-            {/* sort dropdown */}
-            <div
-              className="relative basis-1/2 flex-1"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => {
-                  setSortOpen((v) => !v);
-                  setCityOpen(false);
-                  setDateOpen(false);
-                }}
-                className="w-full justify-between flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black"
-              >
-                <span className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 text-slate-700" />
-                  <span className="text-sm">Sortuj według</span>
-                </span>
-                {sortOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </button>
-
-              {sortOpen && (
-                <div className="absolute z-[9999] mt-1 w-full rounded-md border border-slate-200 bg-white shadow">
-                  {[
-                    { key: "price", label: "Ceny" },
-                    { key: "date", label: "Daty (start)" },
-                    { key: "name", label: "Nazwy" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.key}
-                      onClick={() => {
-                        setSortBy(opt.key as any);
-                        setSortOpen(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                        sortBy === (opt.key as any) ? "font-semibold" : ""
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                  <div className="border-t" />
-                  <button
-                    onClick={() => setAsc((a) => !a)}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                  >
-                    Kierunek: {asc ? "Rosnąco" : "Malejąco"}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* search */}
-            <div className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black basis-1/2 flex-1 min-w-[160px]">
-              <Search className="h-4 w-4 text-slate-700" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Szukaj"
-                className="bg-transparent outline-none text-sm w-full"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-      {/* ===== Map ===== */}
-      <div className="mx-auto max-w-7xl mt-8">
-        <div className="relative h-[380px] sm:h-[460px] lg:h-[520px] rounded-lg overflow-hidden shadow">
-          <MapContainer
-            center={center}
-            zoom={zoom}
-            style={{ height: "100%", width: "100%"}}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution=""
-            />
-
-            {markers.map(({ p, c }) => (
-              <Marker
-                key={p.id}
-                position={[c.lat, c.lng]}
-                icon={p.type === "polkolonie" ? NAVY_PIN : ORANGE_PIN}
-              >
-                <Popup>
-                  <div className="min-w-[240px]">
-                    <h4 className="font-semibold text-slate-800 whitespace-pre-line">{p.title}</h4>
-                    <p className="text-sm text-slate-600">
-                      {p.city} • {new Date(p.start).toLocaleDateString()} –{" "}
-                      {new Date(p.end).toLocaleDateString()}
-                    </p>
-                    <a
-                      href={`/oferta/${p.id}`}
-                      className="mt-2 inline-block rounded-md bg-orange-500 px-3 py-1 text-sm hover:bg-orange-600"
-                    >
-                      Zobacz ofertę
-                    </a>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
-        </div>
-      </div>
-
-      {/* ===== Offers grid ===== */}
-      <div className="mx-auto mt-12 max-w-7xl px-2 sm:px-4 pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((p) => (
-            <article
-              key={p.id}
-              className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm hover:shadow-md transition"
-            >
-              {/* image + price badge */}
-              <div className="relative h-52 sm:h-60">
-                <Image
-                  src={p.image}
-                  alt={p.title}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                />
-                <div className="absolute right-3 bottom-3 bg-slate-100/95 text-slate-900 font-semibold rounded-md px-3 py-2 shadow">
-                  {fmtPrice(p.price)}
-                </div>
-              </div>
-
-              {/* content */}
-              <div className="p-4">
-                <h3 className="text-xl font-bold text-slate-900 whitespace-pre-line">
-                  {p.title}
-                </h3>
-
-                <div className="mt-2 flex items-center justify-between text-orange-600 font-semibold">
-                  <button
-                    onClick={() => {
-                      const c = coordsById[p.id];
-                      if (c) (window as any).__flyTo?.(c.lat, c.lng);
-                    }}
-                    className="hover:underline disabled:opacity-50"
-                    disabled={!coordsById[p.id]}
-                  >
-                    {coordsById[p.id] ? "Pokaż na mapie" : (loadingIds.has(p.id) ? "Ładowanie…" : (errorIds[p.id] ? "Brak lokalizacji" : "Pokaż na mapie"))}
-                  </button>
-                  <span>{p.city}</span>
-                </div>
-
-                <p className="mt-3 text-sm text-slate-700 h-18 leading-relaxed">
-                  {p.desc}
-                </p>
-
-                <button className="mt-4 w-full rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-300 transition">
-                  Rezerwuj / Szczegóły
+            {/* prawa strona */}
+            <div className="flex items-stretch gap-2 flex-1 min-w-[320px]">
+              {/* lokalizacja */}
+              <div className="relative" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => { setCityOpen(v => !v); setDateOpen(false); setSortOpen(false); }}
+                  className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black min-w-[220px]"
+                >
+                  <MapPin className="h-4 w-4 text-slate-700" />
+                  <span className="text-sm">{city || "Wybierz lokalizację"}</span>
+                  {cityOpen ? <ChevronUp className="h-4 w-4 ml-auto" /> : <ChevronDown className="h-4 w-4 ml-auto" />}
                 </button>
+
+                {cityOpen && (
+                  <div className="absolute z-[9999] mt-1 w-[260px] rounded-md border border-slate-200 bg-white shadow">
+                    {cities.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => { setCity(c); setCityOpen(false); }}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${city === c ? "font-semibold" : ""}`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </article>
-          ))}
+
+              {/* daty */}
+              <div className="relative" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => { setDateOpen(v => !v); setCityOpen(false); setSortOpen(false); }}
+                  className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black"
+                >
+                  <CalendarDays className="h-4 w-4 text-slate-700" />
+                  <span className="text-sm">{from || to ? `${from || "od"} – ${to || "do"}` : "Wybierz daty"}</span>
+                  {dateOpen ? <ChevronUp className="ml-12 h-4 w-4" /> : <ChevronDown className="ml-12 h-4 w-4" />}
+                </button>
+
+                {dateOpen && (
+                  <div className="absolute z-[9999] mt-1 w-[220px] rounded-md border border-slate-200 bg-white shadow p-3">
+                    <div className="items-center gap-2">
+                      <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
+                        <span className="text-xs text-slate-600">Od</span>
+                        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-transparent outline-none text-sm w-[100%]" />
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
+                        <span className="text-xs text-slate-600">Do</span>
+                        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-transparent outline-none text-sm w-[100%]" />
+                      </div>
+                    </div>
+                    <div className="mt-2 flex justify-end gap-2">
+                      <button className="text-sm px-2 py-1 rounded hover:bg-slate-50" onClick={() => { setFrom(""); setTo(""); setDateOpen(false); }}>
+                        Wyczyść
+                      </button>
+                      <button className="text-sm px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600" onClick={() => setDateOpen(false)}>
+                        Zastosuj
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* sort + search */}
+              <div className="flex gap-2 flex-1 min-w-[280px]">
+                <div className="relative basis-1/2 flex-1" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => { setSortOpen(v => !v); setCityOpen(false); setDateOpen(false); }}
+                    className="w-full justify-between flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black"
+                  >
+                    <span className="flex items-center gap-2">
+                      <ArrowUpDown className="h-4 w-4 text-slate-700" />
+                      <span className="text-sm">Sortuj według</span>
+                    </span>
+                    {sortOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+
+                  {sortOpen && (
+                    <div className="absolute z-[9999] mt-1 w-full rounded-md border border-slate-200 bg-white shadow">
+                      {[
+                        { key: "price", label: "Ceny" },
+                        { key: "date", label: "Daty (start)" },
+                        { key: "name", label: "Nazwy" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.key}
+                          onClick={() => { setSortBy(opt.key as any); setSortOpen(false); }}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${sortBy === (opt.key as any) ? "font-semibold" : ""}`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                      <div className="border-t" />
+                      <button onClick={() => setAsc(a => !a)} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">
+                        Kierunek: {asc ? "Rosnąco" : "Malejąco"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black basis-1/2 flex-1 min-w-[160px]">
+                  <Search className="h-4 w-4 text-slate-700" />
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Szukaj"
+                    className="bg-transparent outline-none text-sm w-full"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Dwukolumnowy układ: lewa lista, prawa mapa (sticky) ===== */}
+      <div className="mx-auto max-w-7xl px-2 sm:px-4 mt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+          {/* LEWA kolumna: oferty */}
+          <div>
+            <div className="grid pt-4 grid-cols-1 md:grid-cols-2 gap-4">
+              {filtered.map((p) => (
+                <article
+                  key={p.id}
+                  ref={(el) => { cardRefs.current[p.id] = el; }}
+                  onMouseEnter={() => setHoveredId(p.id)}
+                  onMouseLeave={() => setHoveredId((id) => (id === p.id ? null : id))}
+                  className={
+                    "flex flex-col h-full border border-slate-200 rounded-lg overflow-hidden bg-white " +
+                    "shadow-none hover:shadow-sm transition " +
+                    (activeId === p.id ? "ring-2 ring-orange-500" : "")
+                  }
+                >
+                  <div className="relative h-36">
+                    <Image
+                      src={p.image}
+                      alt={p.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                    <div className="absolute right-2 bottom-2 bg-white/90 backdrop-blur-sm text-slate-900 text-sm font-semibold rounded px-2.5 py-1 shadow-sm">
+                      {fmtPrice ? fmtPrice(p.price) : p.price}
+                    </div>
+                  </div>
+
+                  <div className="p-3 flex flex-col flex-1">
+                    <h3 className="text-base font-semibold text-slate-900 leading-snug line-clamp-2">
+                      {p.title}
+                    </h3>
+
+                    <p className="mt-2 text-xs text-slate-700 leading-relaxed">
+                      {truncate(p.desc, 140)}
+                    </p>
+
+                    <button
+                      className="mt-auto w-full rounded-md bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-200 transition"
+                      aria-label={`Zobacz szczegóły oferty ${p.title}`}
+                    >
+                      Zobacz szczegóły
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            {/* extra spacer, aby sticky mapa „odczepiła się” przy końcu listy */}
+            <div className="h-8 lg:h-16" />
+          </div>
+
+          {/* PRAWA kolumna: mapa (sticky) */}
+          <div className="lg:pl-2">
+            <div className="sticky top-[120px] hidden lg:block">
+              {/* wysokość pełnego viewportu minus drobny margines; na mobile mapa i tak spada pod listę */}
+              <div className="relative h-[60vh] sm:h-[70vh] lg:h-[85vh] pt-6 pb-18 rounded-lg overflow-hidden">
+                <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }}>
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="" />
+                  <MapFlyControl />
+
+                  {markers.map(({ p, c }) => {
+                    const isHovered = hoveredId === p.id;
+                    const isActive = activeId === p.id;
+                    const dark = isHovered || isActive;
+                    const icon =
+                      p.type === "polkolonie"
+                        ? dark ? PIN_NAVY_DARK : PIN_NAVY
+                        : dark ? PIN_ORANGE_DARK : PIN_ORANGE;
+
+                    return (
+                      <Marker
+                        key={p.id}
+                        position={[c!.lat, c!.lng]}
+                        icon={icon}
+                      >
+                        <Popup>
+                          <div className="min-w-[240px]">
+                            <h4 className="font-semibold text-slate-800 whitespace-pre-line">{p.title}</h4>
+                            <p className="text-sm text-slate-600">
+                              {p.city} • {new Date(p.start).toLocaleDateString()} – {new Date(p.end).toLocaleDateString()}
+                            </p>
+                            <a
+                              href={`/oferta/${p.id}`}
+                              onClick={() => {
+                                setActiveId(p.id);
+                                const el = cardRefs.current[p.id];
+                                if (el) {
+                                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                  el.classList.add("ring-2", "ring-orange-500");
+                                  setTimeout(() => el.classList.remove("ring-2", "ring-orange-500"), 1200);
+                                }
+                              }}
+                              className="mt-2 inline-block rounded-md bg-orange-500 px-3 py-1 text-sm text-white hover:bg-orange-600"
+                            >
+                              Zobacz ofertę
+                            </a>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    );
+                  })}
+                </MapContainer>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
   );
 }
-

@@ -140,7 +140,7 @@ function FieldTextarea({
         name={name}
         required={required}
         placeholder={placeholder}
-        rows={6}
+        rows={7}
         className="mt-1 w-full border border-slate-300 bg-white px-4 py-3 text-slate-800 shadow-sm outline-none focus:ring-4 focus:ring-orange-500/30 focus:border-orange-500 transition resize-none"
       />
     </label>
