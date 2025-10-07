@@ -1,9 +1,28 @@
+// ===============================
+// 1) .env.local
+// ===============================
+// Keep your API key ONLY on the server. Do NOT expose it to the client.
+// Create .env.local in your project root with:
+//
+// GOOGLE_MAPS_API_KEY=YOUR_SECRET_SERVER_KEY
+//
+// If you also run on Vercel, add this env var there as well.
+
+
+// ===============================
+// 2) app/api/geocode/route.ts  (Next.js 13/14 App Router)
+// ===============================
+
+
+// ===============================
+// 3) components/MapWithOffers.tsx
+// ===============================
 "use client";
 
-import { useMemo, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import type { LatLngTuple } from "leaflet";
-import L from "leaflet";
+import L, { LatLngBounds } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Image from "next/image";
 import {
@@ -25,8 +44,7 @@ export type OfferPoint = {
   city: string;
   start: string; // YYYY-MM-DD
   end: string;   // YYYY-MM-DD
-  lat: number;
-  lng: number;
+  address: string; // e.g. "Łazienkowska 6A, 00-449 Warszawa, Polska"
   type: PointType;
   price: number;       // PLN
   image: string;       // URL or /public path
@@ -61,7 +79,7 @@ function makeTearIcon(color: "orange" | "navy") {
 const ORANGE_PIN = makeTearIcon("orange");
 const NAVY_PIN = makeTearIcon("navy");
 
-/* ===== Demo data (extend as needed) ===== */
+/* ===== Demo data (address only) ===== */
 const DEMO: OfferPoint[] = [
   {
     id: "obo-waw",
@@ -69,11 +87,10 @@ const DEMO: OfferPoint[] = [
     city: "Licheń Stary",
     start: "2025-10-18",
     end: "2025-10-19",
-    lat: 52.315,
-    lng: 18.365,
+    address: "ul. Klasztorna 4, 62-563 Licheń Stary, Polska",
     type: "obozy",
     price: 1090,
-    image: "/demo/obozy1.jpg", // put a file in /public/demo/...
+    image: "/demo/obozy1.jpg",
     desc:
       "Wyjątkowy weekendowy obóz dla dzieci i ich rodziców – buduje pewność siebie i samodzielność w obozowej atmosferze.",
   },
@@ -83,8 +100,7 @@ const DEMO: OfferPoint[] = [
     city: "Warszawa",
     start: "2025-07-01",
     end: "2025-07-05",
-    lat: 52.190,
-    lng: 21.030,
+    address: "Mokotów, Warszawa, Polska",
     type: "polkolonie",
     price: 1190,
     image: "/demo/polkolonie1.jpg",
@@ -97,8 +113,7 @@ const DEMO: OfferPoint[] = [
     city: "Gdańsk",
     start: "2025-07-10",
     end: "2025-07-16",
-    lat: 54.409,
-    lng: 18.568,
+    address: "Oliwa, Gdańsk, Polska",
     type: "obozy",
     price: 1990,
     image: "/demo/obozy2.jpg",
@@ -111,8 +126,7 @@ const DEMO: OfferPoint[] = [
     city: "Poznań",
     start: "2025-07-18",
     end: "2025-07-22",
-    lat: 52.443,
-    lng: 16.934,
+    address: "Winogrady, Poznań, Polska",
     type: "polkolonie",
     price: 990,
     image: "/demo/polkolonie2.jpg",
@@ -121,15 +135,52 @@ const DEMO: OfferPoint[] = [
   },
 ];
 
-/* ===== Component ===== */
-export default function MapWithOffers({
+// --- Simple client cache to reduce API calls across navigations
+const localCacheKey = (addr: string) => `geo:${addr.toLowerCase()}`;
+function getCached(addr: string): { lat: number; lng: number; formatted?: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(localCacheKey(addr));
+    return raw ? JSON.parse(raw) : null;
+  } catch {}
+  return null;
+}
+function setCached(addr: string, value: any) {
+  try { localStorage.setItem(localCacheKey(addr), JSON.stringify(value)); } catch {}
+}
+
+// Fetch coordinates for one address via our server route
+async function geocodeAddress(address: string) {
+  const cached = getCached(address);
+  if (cached) return cached;
+  const res = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+  if (!res.ok) throw new Error(`Geocode failed: ${res.status}`);
+  const data = await res.json();
+  setCached(address, data);
+  return data as { lat: number; lng: number; formatted?: string };
+}
+
+// Helper: fit map to markers once loaded
+function FitBoundsOnce({ coords }: { coords: Array<{ lat: number; lng: number }> }) {
+  const map = useMap();
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (fitted.current || !coords.length) return;
+    const bounds = coords.reduce((b, c) => b.extend([c.lat, c.lng] as any), new LatLngBounds([[coords[0].lat, coords[0].lng], [coords[0].lat, coords[0].lng]]));
+    map.fitBounds(bounds.pad(0.15));
+    fitted.current = true;
+  }, [coords, map]);
+  return null;
+}
+
+export default function MapInner({
   points = DEMO,
   center = [52.1, 19.4] as LatLngTuple,
   zoom = 6,
 }: MapProps) {
   /* filters */
   const [selectedTypes, setSelectedTypes] = useState<Set<PointType>>(
-    () => new Set(["obozy", "polkolonie"])
+    () => new Set(["obozy", "polkolonie"]) 
   );
   const [city, setCity] = useState("Wybierz lokalizację");
   const [from, setFrom] = useState("");
@@ -155,6 +206,40 @@ export default function MapWithOffers({
       return n;
     });
 
+  // === Geocode unique addresses ===
+  type Coords = { lat: number; lng: number; formatted?: string };
+  const [coordsById, setCoordsById] = useState<Record<string, Coords | null>>({});
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const [errorIds, setErrorIds] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let isCancelled = false;
+    async function run() {
+      const unique = new Map<string, string>(); // address -> any id
+      points.forEach(p => unique.set(p.address, p.id));
+
+      for (const p of points) {
+        if (coordsById[p.id] || loadingIds.has(p.id)) continue;
+        setLoadingIds(s => new Set(s).add(p.id));
+        try {
+          const c = await geocodeAddress(p.address);
+          if (isCancelled) return;
+          setCoordsById(prev => ({ ...prev, [p.id]: c }));
+        } catch (e: any) {
+          if (isCancelled) return;
+          setErrorIds(prev => ({ ...prev, [p.id]: e?.message || "Geocode error" }));
+          setCoordsById(prev => ({ ...prev, [p.id]: null }));
+        } finally {
+          setLoadingIds(s => { const n = new Set(s); n.delete(p.id); return n; });
+          // Gentle throttle to avoid QPS limits (optional)
+          await new Promise(r => setTimeout(r, 120));
+        }
+      }
+    }
+    run();
+    return () => { isCancelled = true; };
+  }, [points]);
+
   const filtered = useMemo(() => {
     const qq = q.toLowerCase();
     const list = points.filter(p => {
@@ -164,7 +249,8 @@ export default function MapWithOffers({
       const byQ =
         !qq ||
         p.title.toLowerCase().includes(qq) ||
-        p.city.toLowerCase().includes(qq);
+        p.city.toLowerCase().includes(qq) ||
+        p.address.toLowerCase().includes(qq);
       return byCity && byDate && byQ;
     });
 
@@ -180,12 +266,16 @@ export default function MapWithOffers({
   }, [points, selectedTypes, city, from, to, q, sortBy, asc]);
 
   /* helpers */
-  const fmtPrice = (pln: number) =>
-    `od ${pln.toLocaleString("pl-PL")} zł`;
+  const fmtPrice = (pln: number) => `od ${pln.toLocaleString("pl-PL")} zł`;
+
+  // Build markers from geocoded coords
+  const markers = filtered
+    .map(p => ({ p, c: coordsById[p.id] }))
+    .filter(x => !!x.c) as Array<{ p: OfferPoint; c: Coords }>;
 
   return (
     <section className="w-full sticky">
-      {/* ===== Responsive, full-width control bar ===== */}
+      {/* ===== Control bar (as in your original) ===== */}
       <div className="w-full bg-orange-500 z-[9999]">
         <div className="px-2 sm:px-4">
           <div className="flex flex-wrap items-stretch gap-2 py-2">
@@ -288,7 +378,7 @@ export default function MapWithOffers({
               )}
             </div>
 
-            {/* search – grows to fill line */}
+            {/* search */}
             <div className="flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-white text-black flex-1 min-w-[220px]">
               <Search className="h-4 w-4 text-slate-700" />
               <input
@@ -309,21 +399,16 @@ export default function MapWithOffers({
             center={center}
             zoom={zoom}
             style={{ height: "100%", width: "100%"}}
-            whenCreated={(map) => {
-              // simple “show on map” helper
-              (window as any).__flyTo = (lat: number, lng: number) => {
-                map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 0.8 });
-              };
-            }}
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
-            {filtered.map((p) => (
+
+            {markers.map(({ p, c }) => (
               <Marker
                 key={p.id}
-                position={[p.lat, p.lng]}
+                position={[c.lat, c.lng]}
                 icon={p.type === "polkolonie" ? NAVY_PIN : ORANGE_PIN}
               >
                 <Popup>
@@ -335,7 +420,7 @@ export default function MapWithOffers({
                     </p>
                     <a
                       href={`/oferta/${p.id}`}
-                      className="mt-2 inline-block rounded-md bg-orange-500 text-white px-3 py-1 text-sm hover:bg-orange-600"
+                      className="mt-2 inline-block rounded-md bg-orange-500 px-3 py-1 text-sm hover:bg-orange-600"
                     >
                       Zobacz ofertę
                     </a>
@@ -347,7 +432,7 @@ export default function MapWithOffers({
         </div>
       </div>
 
-      {/* ===== Offers grid (responsive 1/2/3) ===== */}
+      {/* ===== Offers grid ===== */}
       <div className="mx-auto max-w-7xl px-2 sm:px-4 pb-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((p) => (
@@ -377,10 +462,14 @@ export default function MapWithOffers({
 
                 <div className="mt-2 flex items-center justify-between text-orange-600 font-semibold">
                   <button
-                    onClick={() => (window as any).__flyTo?.(p.lat, p.lng)}
-                    className="hover:underline"
+                    onClick={() => {
+                      const c = coordsById[p.id];
+                      if (c) (window as any).__flyTo?.(c.lat, c.lng);
+                    }}
+                    className="hover:underline disabled:opacity-50"
+                    disabled={!coordsById[p.id]}
                   >
-                    Pokaż na mapie
+                    {coordsById[p.id] ? "Pokaż na mapie" : (loadingIds.has(p.id) ? "Ładowanie…" : (errorIds[p.id] ? "Brak lokalizacji" : "Pokaż na mapie"))}
                   </button>
                   <span>{p.city}</span>
                 </div>
@@ -400,3 +489,4 @@ export default function MapWithOffers({
     </section>
   );
 }
+
