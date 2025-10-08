@@ -470,7 +470,7 @@ export default function MapInner({
                   onMouseEnter={() => setHoveredId(p.id)}
                   onMouseLeave={() => setHoveredId((id) => (id === p.id ? null : id))}
                   className={
-                    "flex flex-col h-full border border-slate-200 rounded-lg overflow-hidden bg-white " +
+                    "flex flex-col h-full border border-slate-200 overflow-hidden bg-white " +
                     "shadow-none hover:shadow-sm transition " +
                     (activeId === p.id ? "ring-2 ring-orange-500" : "")
                   }
