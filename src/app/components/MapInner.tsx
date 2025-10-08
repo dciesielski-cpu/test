@@ -355,7 +355,7 @@ export default function MapInner({
                 </button>
 
                 {cityOpen && (
-                  <div className="absolute z-[9999] mt-1 w-[260px] rounded-md border border-slate-200 bg-white shadow">
+                  <div className="absolute z-[9999] mt-1 w-[260px] border border-slate-200 bg-white shadow">
                     {cities.map((c) => (
                       <button
                         key={c}
@@ -381,7 +381,7 @@ export default function MapInner({
                 </button>
 
                 {dateOpen && (
-                  <div className="absolute z-[9999] mt-1 w-[220px] rounded-md border border-slate-200 bg-white shadow p-3">
+                  <div className="absolute z-[9999] mt-1 w-[220px] border border-slate-200 bg-white shadow p-3">
                     <div className="items-center gap-2">
                       <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-black">
                         <span className="text-xs text-slate-600">Od</span>
@@ -419,7 +419,7 @@ export default function MapInner({
                   </button>
 
                   {sortOpen && (
-                    <div className="absolute z-[9999] mt-1 w-full rounded-md border border-slate-200 bg-white shadow">
+                    <div className="absolute z-[9999] mt-1 w-full border border-slate-200 bg-white shadow">
                       {[
                         { key: "price", label: "Ceny" },
                         { key: "date", label: "Daty (start)" },
