@@ -90,7 +90,7 @@ function PinCheckbox({
         e.stopPropagation();
         onClick();
       }}
-      className={`flex items-center gap-2 px-3 py-2 border-[3px] border-orange-600 bg-transparent rounded-md ${textColor}`}
+      className={`flex items-center gap-2 px-3 py-2 border-[3px] bg-white border-orange-600 ${textColor}`}
       title={label}
       aria-pressed={checked}
     >
@@ -322,10 +322,10 @@ export default function MapInner({
     <section className="w-full">
       {/* ===== Pasek sterowania ===== */}
       <div
-        className="z-[9999] sticky top-[80px]"
+        className="z-[9999] sticky bg-orange-500 top-[80px]"
         onClick={() => { setCityOpen(false); setDateOpen(false); setSortOpen(false); }}
       >
-        <div className="px-2 sm:px-4 bg-white border-indigo-900/20 border-t-2">
+        <div className="px-2 sm:px-4 border-indigo-900/20 border-t-2">
           <div className="flex flex-wrap text-black items-stretch max-w-7xl gap-2 py-2 mx-auto">
             {/* checkboxy z pinami */}
             <PinCheckbox
@@ -535,7 +535,7 @@ export default function MapInner({
                           <div className="min-w-[240px]">
                             <h4 className="font-semibold text-slate-800 whitespace-pre-line">{p.title}</h4>
                             <p className="text-sm text-slate-600">
-                              {p.city} • {new Date(p.start).toLocaleDateString()} – {new Date(p.end).toLocaleDateString()}
+                              {p.address} <br></br> {new Date(p.start).toLocaleDateString()} – {new Date(p.end).toLocaleDateString()}
                             </p>
                             <a
                               href={`/oferta/${p.id}`}
@@ -548,7 +548,7 @@ export default function MapInner({
                                   setTimeout(() => el.classList.remove("ring-2", "ring-orange-500"), 1200);
                                 }
                               }}
-                              className="mt-2 inline-block rounded-md bg-orange-500 px-3 py-1 text-sm text-white hover:bg-orange-600"
+                              className="mt-2 inline-block bg-orange-500 px-3 py-1 text-sm text-white hover:bg-orange-600"
                             >
                               Zobacz ofertę
                             </a>
